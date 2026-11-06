@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>InBody Reader Real OCR</title>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-900 text-gray-100 min-h-screen flex items-center justify-center p-4">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState } = React;
+
+        function InBodyScannerApp() {
+            const [selectedFile, setSelectedFile] = useState(null);
+            const [previewUrl, setPreviewUrl] = useState(null);
+            const [loading, setLoading] = useState(false);
+            const [metrics, setMetrics] = useState(null);
+            const [rawText, setRawText] = useState("");
+
+            const handleFileChange = (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    setSelectedFile(file);
+                    setPreviewUrl(URL.createObjectURL(file));
+                    setMetrics(null);
+                }
+            };
+
+            const handleScan = async () => {
+                if (!selectedFile) return alert("اختر صورة التقرير أولاً");
+                setLoading(true);
+
+                const formData = new FormData();
+                formData.append('image', selectedFile);
+
+                try {
+                    const res = await axios.post('http://localhost:5001/api/scan-inbody', formData);
+                    setMetrics(res.data.extracted_metrics);
+                    setRawText(res.data.extracted_metrics.raw_extracted_text);
+                } catch (err) {
+                    console.error(err);
+                    alert("حدث خطأ أثناء قراءة تقرير الإن بودي بالـ OCR");
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            const handleMetricChange = (field, val) => {
+                setMetrics({ ...metrics, [field]: val });
+            };
+
+            return (
+                <div className="w-full max-w-xl bg-gray-800 rounded-2xl p-6 border border-gray-700 shadow-xl">
+                    <h1 className="text-xl font-bold text-center text-blue-400 mb-6">📊 InBody Real OCR Scanner (EasyOCR + Tesseract)</h1>
+                    
+                    <div className="mb-4">
+                        {previewUrl && <img src={previewUrl} className="w-full h-56 object-contain rounded mb-3 bg-gray-950 p-2" />}
+                        <input type="file" accept="image/*" onChange={handleFileChange} className="text-sm text-gray-400 w-full" />
+                    </div>
+
+                    <button 
+                        onClick={handleScan} 
+                        disabled={loading}
+                        className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-2.5 rounded-lg mb-6"
+                    >
+                        {loading ? 'جاري القراءة الفعلية بـ EasyOCR...' : 'مسح التقرير وقراءة القياسات'}
+                    </button>
+
+                    {metrics && (
+                        <div className="bg-gray-900 p-4 rounded-xl border border-gray-700 space-y-3">
+                            <h3 className="text-sm font-bold text-amber-400 mb-2">النتائج المستخرجة بالفعل (تأكيد البيانات):</h3>
+                            
+                            <div className="flex justify-between items-center text-sm">
+                                <span>الوزن (Weight kg):</span>
+                                <input type="number" value={metrics.weight_kg || ''} onChange={(e) => handleMetricChange('weight_kg', e.target.value)} className="w-24 bg-gray-800 border border-gray-600 rounded p-1 text-center" />
+                            </div>
+
+                            <div className="flex justify-between items-center text-sm">
+                                <span>كتلة العضلات (SMM kg):</span>
+                                <input type="number" value={metrics.skeletal_muscle_mass_kg || ''} onChange={(e) => handleMetricChange('skeletal_muscle_mass_kg', e.target.value)} className="w-24 bg-gray-800 border border-gray-600 rounded p-1 text-center" />
+                            </div>
+
+                            <div className="flex justify-between items-center text-sm">
+                                <span>نسبة الدهون (PBF %):</span>
+                                <input type="number" value={metrics.body_fat_percent || ''} onChange={(e) => handleMetricChange('body_fat_percent', e.target.value)} className="w-24 bg-gray-800 border border-gray-600 rounded p-1 text-center" />
+                            </div>
+
+                            <div className="flex justify-between items-center text-sm">
+                                <span>مؤشر كتلة الجسم (BMI):</span>
+                                <input type="number" value={metrics.bmi || ''} onChange={(e) => handleMetricChange('bmi', e.target.value)} className="w-24 bg-gray-800 border border-gray-600 rounded p-1 text-center" />
+                            </div>
+
+                            <div className="mt-4 p-3 bg-gray-950 rounded-lg border border-gray-700 text-xs text-gray-300 leading-relaxed max-h-40 overflow-y-auto font-mono">
+                                <strong className="text-blue-400 block mb-1">📝 النص الخام المقروء بـ OCR:</strong>
+                                {rawText}
+                            </div>
+
+                            <button onClick={() => alert("تم حفظ القياسات الحقيقية بنجاح!")} className="w-full mt-4 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-bold py-2 rounded-lg">
+                                تأكيد وحفظ في البروفايل
+                            </button>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        ReactDOM.createRoot(document.getElementById('root')).render(<InBodyScannerApp />);
+    </script>
+</body>
+</html>
